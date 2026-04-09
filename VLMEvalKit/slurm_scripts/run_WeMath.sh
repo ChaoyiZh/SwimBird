@@ -17,10 +17,10 @@ set -euo pipefail
 
 MODEL_NAME="${1:-${MODEL_NAME:-SwimBird-SFT-8B}}"
 
-PROJECT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/VLMEvalKit"
+PROJECT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SwimBird/VLMEvalKit"
 cd "${PROJECT_ROOT}"
 
-export LMUData=/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/datasets/VLMEval
+export LMUData=/project/siyuh/common/chaoyi/workspace/code/SwimBird/datasets/VLMEval
 mkdir -p "${LMUData}"
 
 mkdir -p "${PROJECT_ROOT}/slurm_logs"
