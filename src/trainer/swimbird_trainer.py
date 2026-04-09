@@ -45,13 +45,19 @@ class SwimBirdSFTTrainer(Trainer):
             return value.detach().float().mean().item()
         return float(value)
 
+    @staticmethod
+    def _safe_output_get(outputs, key):
+        if isinstance(outputs, dict):
+            return outputs.get(key, None)
+        return getattr(outputs, key, None)
+
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if num_items_in_batch is None:
             outputs = model(**inputs)
         else:
             outputs = model(**inputs, num_items_in_batch=num_items_in_batch)
 
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs.loss
+        loss = self._safe_output_get(outputs, "loss")
 
         metrics = {}
         for key, log_key in (
@@ -59,7 +65,7 @@ class SwimBirdSFTTrainer(Trainer):
             ("latent_loss", "train/loss_latent"),
             ("weighted_latent_loss", "train/loss_latent_weighted"),
         ):
-            value = outputs[key] if isinstance(outputs, dict) else getattr(outputs, key, None)
+            value = self._safe_output_get(outputs, key)
             value = self._to_float(value)
             if value is not None:
                 metrics[log_key] = value
