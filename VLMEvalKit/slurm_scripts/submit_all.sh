@@ -48,7 +48,7 @@ if (( $# >= 2 )) && [[ "$1" == "--model" ]]; then
     shift 2
 fi
 
-LOG_ROOT="/project/siyuh/common/chaoyi/workspace/code/SwimBird/VLMEvalKit/slurm_logs/${EXP_NAME}"
+LOG_ROOT="/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/VLMEvalKit/slurm_logs/${EXP_NAME}"
 mkdir -p "${LOG_ROOT}"
 
 if (( $# == 0 )); then

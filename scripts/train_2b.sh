@@ -59,7 +59,6 @@ export PYTHONPATH=$(pwd)
 echo "[train] MODEL_NAME=${MODEL_NAME}"
 echo "[train] OUTPUT_DIR=${OUTPUT_DIR}"
 echo "[train] DATA_PATH=${DATA_PATH[*]}"
-echo "[train] RESUME_TRAINING_STATE=${RESUME_TRAINING_STATE}"
 torchrun $DISTRIBUTED_ARGS \
     src/train/train.py \
     --run_name "$RUN_NAME" \

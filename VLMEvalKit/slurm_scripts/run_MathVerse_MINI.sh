@@ -10,17 +10,17 @@
 #SBATCH --partition=mri2020
 #SBATCH --mail-user=chaoyiz@clemson.edu
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=/data/chaoyiz/workspace/code/SwimBird/VLMEvalKit/slurm_logs/%x.out
-#SBATCH --error=/data/chaoyiz/workspace/code/SwimBird/VLMEvalKit/slurm_logs/%x.err
+#SBATCH --output=/data/chaoyiz/workspace/code/SWIMBIRD/VLMEvalKit/slurm_logs/%x.out
+#SBATCH --error=/data/chaoyiz/workspace/code/SWIMBIRD/VLMEvalKit/slurm_logs/%x.err
 
 set -euo pipefail
 
 MODEL_NAME="${1:-${MODEL_NAME:-SwimBird-SFT-8B}}"
 
-PROJECT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SwimBird/VLMEvalKit"
+PROJECT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/VLMEvalKit"
 cd "${PROJECT_ROOT}"
 
-export LMUData=/project/siyuh/common/chaoyi/workspace/code/SwimBird/datasets/VLMEval
+export LMUData=/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/datasets/VLMEval
 mkdir -p "${LMUData}"
 
 mkdir -p "${PROJECT_ROOT}/slurm_logs"
