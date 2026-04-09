@@ -10,13 +10,13 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --partition=mri2020
 #SBATCH --mail-user=chaoyiz@clemson.edu
-#SBATCH --output=/project/siyuh/common/chaoyi/workspace/code/SwimBird/slurm_pretrain_singlenode_2b_logs/%x_%j.out
-#SBATCH --error=/project/siyuh/common/chaoyi/workspace/code/SwimBird/slurm_pretrain_singlenode_2b_logs/%x_%j.err
+#SBATCH --output=/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/slurm_pretrain_singlenode_2b_logs/%x_%j.out
+#SBATCH --error=/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/slurm_pretrain_singlenode_2b_logs/%x_%j.err
 #SBATCH --export=ALL
 
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/project/siyuh/common/chaoyi/workspace/code/SwimBird}"
+PROJECT_ROOT="${PROJECT_ROOT:-/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD}"
 LOG_DIR="${PROJECT_ROOT}/slurm_pretrain_singlenode_2b_logs"
 SCRIPT_DIR="${PROJECT_ROOT}/scripts/slurm_train_2b"
 LAUNCH_SCRIPT="${SCRIPT_DIR}/pretrain_slurm.sh"

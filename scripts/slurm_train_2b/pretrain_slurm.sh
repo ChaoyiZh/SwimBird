@@ -5,7 +5,7 @@ set -euo pipefail
 source /home/chaoyiz/miniconda3/etc/profile.d/conda.sh
 conda activate swimbird
 
-PROJECT_ROOT="${PROJECT_ROOT:-/project/siyuh/common/chaoyi/workspace/code/SwimBird}"
+PROJECT_ROOT="${PROJECT_ROOT:-/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD}"
 LOG_DIR="${PROJECT_ROOT}/slurm_pretrain_singlenode_2b_logs"
 cd "${PROJECT_ROOT}"
 
