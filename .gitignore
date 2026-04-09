@@ -12,7 +12,6 @@ src/train/__pycache__
 log_to_be_analyzed/
 swimbird_singlenode_2b/
 swimbird_singlenode/
-swimbird/
 wandb/
 vllm/
 VLMEvalKit/outputs/
