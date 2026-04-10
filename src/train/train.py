@@ -2,8 +2,9 @@ import os
 import pathlib
 import torch
 from transformers import AutoProcessor, AutoConfig, HfArgumentParser
+from transformers.integrations.integration_utils import WandbCallback
 
-from src.trainer import SwimBirdSFTTrainer
+from src.trainer import SwimBirdSFTTrainer, SwimBirdWandbCallback
 from src.dataset import make_supervised_data_module
 from src.params import DataArguments, ModelArguments, TrainingArguments
 from src.model.swimbird import SwimBird_Qwen2_5_VL, SwimBird_Qwen3VL
@@ -172,6 +173,10 @@ def train():
         args=training_args,
         **data_module
     )
+
+    if "wandb" in training_args.report_to:
+        trainer.remove_callback(WandbCallback)
+        trainer.add_callback(SwimBirdWandbCallback)
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)

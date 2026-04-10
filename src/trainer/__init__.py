@@ -1,4 +1,4 @@
-from .swimbird_trainer import SwimBirdSFTTrainer
+from .swimbird_trainer import SwimBirdSFTTrainer, SwimBirdWandbCallback
 
 
-__all__ = ["SwimBirdSFTTrainer"]
+__all__ = ["SwimBirdSFTTrainer", "SwimBirdWandbCallback"]

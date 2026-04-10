@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from transformers import Trainer
+from transformers.integrations.integration_utils import WandbCallback
 from transformers.trainer import (
     is_sagemaker_mp_enabled,
     get_parameter_names,
@@ -14,6 +15,28 @@ from transformers.trainer import (
 )
 
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
+
+
+class SwimBirdWandbCallback(WandbCallback):
+    def on_log(self, args, state, control, model=None, logs=None, **kwargs):
+        single_value_scalars = [
+            "train_runtime",
+            "train_samples_per_second",
+            "train_steps_per_second",
+            "train_loss",
+            "total_flos",
+        ]
+
+        if self._wandb is None:
+            return
+        if not self._initialized:
+            self.setup(args, state, model, **kwargs)
+        if state.is_world_process_zero:
+            for key, value in logs.items():
+                if key in single_value_scalars:
+                    self._wandb.run.summary[key] = value
+            non_scalar_logs = {key: value for key, value in logs.items() if key not in single_value_scalars}
+            self._wandb.log(non_scalar_logs, step=state.global_step)
 
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -33,7 +56,8 @@ class SwimBirdSFTTrainer(Trainer):
 
     def __init__(self, *args, **kwargs):
         super(SwimBirdSFTTrainer, self).__init__(*args, **kwargs)
-        self._latest_loss_metrics = {}
+        self._loss_metric_sums = {}
+        self._loss_metric_counts = {}
 
     @staticmethod
     def _to_float(value):
@@ -51,6 +75,10 @@ class SwimBirdSFTTrainer(Trainer):
             return outputs.get(key, None)
         return getattr(outputs, key, None)
 
+    def _reset_loss_metric_accumulator(self):
+        self._loss_metric_sums = {}
+        self._loss_metric_counts = {}
+
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if num_items_in_batch is None:
             outputs = model(**inputs)
@@ -61,23 +89,30 @@ class SwimBirdSFTTrainer(Trainer):
 
         metrics = {}
         for key, log_key in (
-            ("ce_loss", "train/loss_ce"),
-            ("latent_loss", "train/loss_latent"),
-            ("weighted_latent_loss", "train/loss_latent_weighted"),
+            ("ce_loss", "loss_ce"),
+            ("latent_loss", "loss_latent"),
+            ("weighted_latent_loss", "loss_latent_weighted"),
         ):
             value = self._safe_output_get(outputs, key)
             value = self._to_float(value)
             if value is not None:
                 metrics[log_key] = value
-        self._latest_loss_metrics = metrics
+
+        if model.training and metrics:
+            for key, value in metrics.items():
+                self._loss_metric_sums[key] = self._loss_metric_sums.get(key, 0.0) + value
+                self._loss_metric_counts[key] = self._loss_metric_counts.get(key, 0) + 1
 
         return (loss, outputs) if return_outputs else loss
 
     def log(self, logs, start_time=None):
-        if self._latest_loss_metrics and "loss" in logs and "eval_loss" not in logs:
+        if self._loss_metric_counts and "loss" in logs and "eval_loss" not in logs:
             logs = dict(logs)
-            for key, value in self._latest_loss_metrics.items():
-                logs.setdefault(key, value)
+            for key, value in self._loss_metric_sums.items():
+                count = self._loss_metric_counts.get(key, 0)
+                if count > 0:
+                    logs.setdefault(key, value / count)
+            self._reset_loss_metric_accumulator()
         return super().log(logs, start_time=start_time)
 
     def create_optimizer(self):
