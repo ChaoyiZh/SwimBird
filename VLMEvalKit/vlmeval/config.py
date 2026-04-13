@@ -1773,7 +1773,7 @@ for step in (200, 400, 600, 722):
         **SWIMBIRD_COMMON_KWARGS
     )
 
-for step in (200, 600, 1000, 1400, 1800, 2200, 2600, 3000, 3400, 3800, 4200, 4600, 5000, 5400, 5774):
+for step in (200, 1000, 1800, 2600, 3400, 4200, 5000, 5774):
     swimbird_series[f'SwimBird-SFT-2B_ckpt{step}'] = partial(
         SwimBird,
         model_path=f'{SWIMBIRD_2B_RETRAIN_ROOT}/checkpoint-{step}',

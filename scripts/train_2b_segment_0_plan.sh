@@ -92,7 +92,7 @@ torchrun $DISTRIBUTED_ARGS \
     --gradient_checkpointing $GRAD_CHECK \
     --lazy_preprocess True \
     --save_strategy "steps" \
-    --save_steps 200 \
+    --save_steps 500 \
     --save_total_limit 30 \
     --dataloader_num_workers 8 \
     --random_seed $RANDOM_SEED \
