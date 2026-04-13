@@ -226,7 +226,11 @@ where:
 
 The plan segment receives:
 
-- no text CE supervision
+- CE supervision on the delimiter tokens:
+  - `<|plan_start|>`
+  - `<|plan_end|>`
+- no text CE supervision on the internal latent body tokens:
+  - repeated `<|latent|>` inside the plan span
 - no image-backed latent MSE supervision
 
 It is a hidden planning span only.
@@ -292,35 +296,38 @@ This matters for:
   - `<|plan_end|>`
   alongside the existing latent tokens.
 
-- [ ] Implement segment-aware preprocessing
-  Update preprocessing so it:
-  - identifies the first visible reasoning segment
-  - replaces it with the `plan` span
-  - keeps all later segments unchanged
-  - leaves samples unchanged when no valid reasoning segment exists
+- [x] Implement plan-aware preprocessing consumption
+  Update online preprocessing so it:
+  - correctly recognizes pre-inserted `plan` spans from the offline dataset
+  - preserves the `plan` span instead of treating it as ordinary reasoning text
+  - keeps all later visible reasoning segments unchanged
+  - keeps later image-backed latent segments unchanged
 
 - [ ] Implement masking and supervision routing
   Ensure:
-  - plan span is excluded from CE labels
+  - the internal plan body is excluded from CE labels
+  - `plan_start` and `plan_end` remain CE-supervised
   - plan span is excluded from image latent MSE
   - later image-backed latent spans still contribute to latent/image loss
   - later visible text still contributes to CE
 
-- [ ] Integrate training path
-  Train using the full training set with the new preprocessing rule.
-
-- [ ] Add a new training launch entry
-  Create a new launch path under:
+- [x] Add a new training launch entry
+  Added a dedicated `segment_0_plan` training path under:
   - `/data/chaoyiz/workspace/code/SWIMBIRD/scripts/slurm_train_2b`
-  following the style of the current SLURM launcher and `train_2b.sh`.
 
-  The new launch entry should:
-  - start a new experiment for `segment_0_plan`
-  - use a fresh output directory
-  - use the processed offline dataset variant
-  - initialize from:
+  The launch path:
+  - starts a new `segment_0_plan` experiment
+  - uses a fresh output directory
+  - points to the processed offline dataset variant
+  - initializes from:
     `/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b/checkpoint-5774`
-  - continue finetuning from that checkpoint as initialization only, not as a trainer-state resume
+  - uses that checkpoint as initialization only, not as a trainer-state resume
+
+- [ ] Validate end-to-end training path
+  Confirm that the full training path works with:
+  - the processed offline dataset variant
+  - the new `segment_0_plan` launch entry
+  - the corrected masking and supervision routing
 
 ## 13. Debug and verification requirements
 
@@ -334,7 +341,7 @@ At minimum, debugging output should allow us to verify:
 2. what the first visible reasoning segment originally was
 3. what the transformed assistant content looks like
 4. where the `plan` span appears in the serialized text
-5. whether the plan span is excluded from CE labels
+5. whether the internal plan body is excluded from CE labels while `plan_start/plan_end` remain supervised
 6. whether the plan span is excluded from image latent loss masks
 
 Suggested debugging style for V1:
