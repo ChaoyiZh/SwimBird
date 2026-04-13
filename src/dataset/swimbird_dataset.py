@@ -15,12 +15,6 @@ from src.constants import (
     PLAN_END_TOKEN,
 )
 
-DEBUG_PLAN_BATCH_PRINT_LIMIT = 8
-_debug_plan_batch_print_count = 0
-DEBUG_PLAN_PREPROCESS_PRINT_LIMIT = 12
-_debug_plan_preprocess_print_count = 0
-
-
 def is_plan_segment(text: str) -> bool:
     stripped = text.strip()
     return (
@@ -28,30 +22,6 @@ def is_plan_segment(text: str) -> bool:
         and PLAN_END_TOKEN in stripped
         and stripped.index(PLAN_START_TOKEN) < stripped.index(PLAN_END_TOKEN)
     )
-
-
-def debug_print_preprocessed_plan(sample_id: str, assistant_content) -> None:
-    global _debug_plan_preprocess_print_count
-    if _debug_plan_preprocess_print_count >= DEBUG_PLAN_PREPROCESS_PRINT_LIMIT:
-        return
-
-    summary = []
-    for item in assistant_content:
-        if item.get("type") == "image":
-            summary.append("image")
-            continue
-        text = item.get("text", "")
-        compact = text.replace("\n", "\\n")
-        if len(compact) > 120:
-            compact = compact[:120] + "..."
-        summary.append(compact)
-
-    print(
-        "[debug-plan-preprocess]",
-        f"sample_id={sample_id}",
-        f"assistant_segments={summary}",
-    )
-    _debug_plan_preprocess_print_count += 1
 
 # ========== Dataset Class ==========
 class SwimBirdSFTDataset(Dataset):
@@ -251,7 +221,6 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
 
     reasoning_parts = re.split(r'(<image>)', reasoning_text)
     reasoning_image_idx = 0
-    contains_plan_segment = False
 
     for part in reasoning_parts:
         part = part.strip()
@@ -281,7 +250,6 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
         else:
             # This is a reasoning text part
             if is_plan_segment(part):
-                contains_plan_segment = True
                 assistant_content.append({
                     "type": "text",
                     "text": f"{part.strip()}\n"
@@ -310,9 +278,6 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
         logging.warning(f"user_content or assistant_content is empty after processing, skipping sample {example.get('id', 'N/A')}")
         return None
 
-    if contains_plan_segment:
-        debug_print_preprocessed_plan(example.get('id', 'N/A'), assistant_content)
-        
     return [
         {"role": "system", "content": SYSTEM_MESSAGE},
         {"role": "user", "content": user_content},
@@ -331,14 +296,11 @@ class SwimBirdDataCollator:
         self.latent_token_idx = processor.tokenizer(LATENT_TOKEN, return_tensors="pt")["input_ids"][0]
         self.latent_start_idx = processor.tokenizer(LATENT_START_TOKEN, return_tensors="pt")["input_ids"][0]
         self.latent_end_idx = processor.tokenizer(LATENT_END_TOKEN, return_tensors="pt")["input_ids"][0]
-        self.plan_start_idx = processor.tokenizer(PLAN_START_TOKEN, return_tensors="pt")["input_ids"][0]
-        self.plan_end_idx = processor.tokenizer(PLAN_END_TOKEN, return_tensors="pt")["input_ids"][0]
         self.pad_token_idx = processor.tokenizer("<|endoftext|>", return_tensors="pt")["input_ids"][0]
         self.answer_start_token_pattern = processor.tokenizer("<|im_start|>assistant", return_tensors="pt")["input_ids"][0]
     
     def __call__(self, raw_examples):
         """Process batch of raw examples."""
-        global _debug_plan_batch_print_count
         examples = [
             cot_preprocess_function(
                 ex, 
@@ -381,31 +343,9 @@ class SwimBirdDataCollator:
             self.latent_start_idx, self.latent_end_idx, self.latent_token_idx, 
             self.answer_start_token_pattern, self.pad_token_idx
         )
-           
+
         batch["input_ids"] = new_input_ids
         batch["attention_mask"] = new_attention_mask
-
-        if _debug_plan_batch_print_count < DEBUG_PLAN_BATCH_PRINT_LIMIT:
-            plan_start_count = (batch["input_ids"] == self.plan_start_idx).sum().item()
-            plan_end_count = (batch["input_ids"] == self.plan_end_idx).sum().item()
-            latent_count = (batch["input_ids"] == self.latent_token_idx).sum().item()
-            latent_start_count = (batch["input_ids"] == self.latent_start_idx).sum().item()
-            latent_end_count = (batch["input_ids"] == self.latent_end_idx).sum().item()
-            latent_feature_count = 0
-            if batch["pixel_values_latent"] is not None and batch["image_grid_thw_latent"] is not None:
-                for grid in batch["image_grid_thw_latent"]:
-                    latent_feature_count += int(grid[0].item() * grid[1].item() * grid[2].item())
-
-            print(
-                "[debug-plan-batch]",
-                f"plan_starts={plan_start_count}",
-                f"plan_ends={plan_end_count}",
-                f"latent_starts={latent_start_count}",
-                f"latent_ends={latent_end_count}",
-                f"latent_tokens={latent_count}",
-                f"latent_feature_tokens={latent_feature_count}",
-            )
-            _debug_plan_batch_print_count += 1
 
         labels = generate_labels_after_multi_token_start(
             batch["input_ids"], self.answer_start_token_pattern, 
@@ -422,14 +362,6 @@ class SwimBirdDataCollator:
             )
             batch["image_out_mask"] = image_out_mask
 
-            if _debug_plan_batch_print_count <= DEBUG_PLAN_BATCH_PRINT_LIMIT:
-                image_mask_count = int(image_out_mask.sum().item())
-                print(
-                    "[debug-plan-image-mask]",
-                    f"image_mask_tokens={image_mask_count}",
-                    f"latent_feature_tokens={latent_feature_count}",
-                )
-            
         return batch
 
 

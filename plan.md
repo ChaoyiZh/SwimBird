@@ -303,7 +303,7 @@ This matters for:
   - keeps all later visible reasoning segments unchanged
   - keeps later image-backed latent segments unchanged
 
-- [ ] Implement masking and supervision routing
+- [x] Implement masking and supervision routing
   Ensure:
   - the internal plan body is excluded from CE labels
   - `plan_start` and `plan_end` remain CE-supervised
