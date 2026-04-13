@@ -17,6 +17,41 @@ from src.constants import (
 
 DEBUG_PLAN_BATCH_PRINT_LIMIT = 8
 _debug_plan_batch_print_count = 0
+DEBUG_PLAN_PREPROCESS_PRINT_LIMIT = 12
+_debug_plan_preprocess_print_count = 0
+
+
+def is_plan_segment(text: str) -> bool:
+    stripped = text.strip()
+    return (
+        PLAN_START_TOKEN in stripped
+        and PLAN_END_TOKEN in stripped
+        and stripped.index(PLAN_START_TOKEN) < stripped.index(PLAN_END_TOKEN)
+    )
+
+
+def debug_print_preprocessed_plan(sample_id: str, assistant_content) -> None:
+    global _debug_plan_preprocess_print_count
+    if _debug_plan_preprocess_print_count >= DEBUG_PLAN_PREPROCESS_PRINT_LIMIT:
+        return
+
+    summary = []
+    for item in assistant_content:
+        if item.get("type") == "image":
+            summary.append("image")
+            continue
+        text = item.get("text", "")
+        compact = text.replace("\n", "\\n")
+        if len(compact) > 120:
+            compact = compact[:120] + "..."
+        summary.append(compact)
+
+    print(
+        "[debug-plan-preprocess]",
+        f"sample_id={sample_id}",
+        f"assistant_segments={summary}",
+    )
+    _debug_plan_preprocess_print_count += 1
 
 # ========== Dataset Class ==========
 class SwimBirdSFTDataset(Dataset):
@@ -216,6 +251,7 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
 
     reasoning_parts = re.split(r'(<image>)', reasoning_text)
     reasoning_image_idx = 0
+    contains_plan_segment = False
 
     for part in reasoning_parts:
         part = part.strip()
@@ -244,15 +280,22 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
                 logging.warning(f"An <image> tag was found in the GPT response, but there are not enough image paths in the 'reasoning_image' list.")
         else:
             # This is a reasoning text part
-            # Remove "THOUGHT x: " tags
-            cleaned_text = re.sub(r'THOUGHT \d+:\s*', '', part).strip()
-            # cleaned_text = cleaned_text.replace('\n\n', '\n')
-            if cleaned_text:
+            if is_plan_segment(part):
+                contains_plan_segment = True
                 assistant_content.append({
                     "type": "text",
-                    # Wrap with <reason> tag
-                    "text": f"<reason>{cleaned_text}</reason>\n"
+                    "text": f"{part.strip()}\n"
                 })
+            else:
+                # Remove "THOUGHT x: " tags
+                cleaned_text = re.sub(r'THOUGHT \d+:\s*', '', part).strip()
+                # cleaned_text = cleaned_text.replace('\n\n', '\n')
+                if cleaned_text:
+                    assistant_content.append({
+                        "type": "text",
+                        # Wrap with <reason> tag
+                        "text": f"<reason>{cleaned_text}</reason>\n"
+                    })
 
     # 4. Append the final answer
     final_answer = example.get('answer', '')
@@ -266,6 +309,9 @@ def cot_preprocess_function(example, max_pixels=5120*32*32, min_pixels=128*32*32
     if not user_content or not assistant_content:
         logging.warning(f"user_content or assistant_content is empty after processing, skipping sample {example.get('id', 'N/A')}")
         return None
+
+    if contains_plan_segment:
+        debug_print_preprocessed_plan(example.get('id', 'N/A'), assistant_content)
         
     return [
         {"role": "system", "content": SYSTEM_MESSAGE},
