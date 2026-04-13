@@ -88,6 +88,7 @@ def qwen2_5_mixed_modality_forward(
     second_per_grid_ts: Optional[torch.Tensor] = None,  # =============================
     pixel_values_latent: Optional[torch.Tensor] = None, # latent images
     image_grid_thw_latent: Optional[torch.LongTensor] = None, # latent images grid
+    image_out_mask: Optional[torch.Tensor] = None,
     in_latent_mode: Optional[torch.Tensor] = None,
     latent_hidden_state: Optional[torch.Tensor] = None,
     **kwargs: Unpack[TransformersKwargs],
@@ -135,15 +136,15 @@ def qwen2_5_mixed_modality_forward(
     if pixel_values_latent is not None:
         latent_image_embeds = self.get_image_features(pixel_values_latent, image_grid_thw_latent)
         latent_image_embeds = torch.cat(latent_image_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
-        n_image_tokens = (input_ids == self.config.latent_id).sum().item()
+        mask = image_out_mask.to(inputs_embeds.device).bool() if image_out_mask is not None else (input_ids == self.config.latent_id)
+        n_image_tokens = mask.sum().item()
         n_image_features = latent_image_embeds.shape[0]
         # reasoning image token num != latent token num 
         if n_image_tokens != n_image_features:
             raise ValueError(
                 f"Latent image features and latent tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
             )
-        
-        mask = input_ids == self.config.latent_id
+
         mask_unsqueezed = mask.unsqueeze(-1)
         mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
         image_mask = mask_expanded.to(inputs_embeds.device)
@@ -303,6 +304,7 @@ def qwen2_5_vl_generation_forward(
         cache_position=cache_position,
         pixel_values_latent=pixel_values_latent,
         image_grid_thw_latent=image_grid_thw_latent,
+        image_out_mask=image_out_mask,
         in_latent_mode=in_latent_mode,
         latent_hidden_state=latent_hidden_state,
         **kwargs,
@@ -373,6 +375,7 @@ def qwen3_vl_mixed_modality_forward(
     cache_position: Optional[torch.LongTensor] = None,
     pixel_values_latent: Optional[torch.Tensor] = None, # latent images
     image_grid_thw_latent: Optional[torch.LongTensor] = None, # latent images grid
+    image_out_mask: Optional[torch.Tensor] = None,
     in_latent_mode: Optional[torch.Tensor] = None,
     latent_hidden_state: Optional[torch.Tensor] = None,
     **kwargs: Unpack[TransformersKwargs],
@@ -416,7 +419,8 @@ def qwen3_vl_mixed_modality_forward(
         latent_image_embeds, _ = self.get_image_features(pixel_values_latent, image_grid_thw_latent)
 
         latent_image_embeds = torch.cat(latent_image_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
-        n_image_tokens = (input_ids == self.config.latent_id).sum().item()
+        mask = image_out_mask.to(inputs_embeds.device).bool() if image_out_mask is not None else (input_ids == self.config.latent_id)
+        n_image_tokens = mask.sum().item()
         n_image_features = latent_image_embeds.shape[0]
 
         if n_image_tokens != n_image_features:
@@ -432,8 +436,7 @@ def qwen3_vl_mixed_modality_forward(
                 f"plan_starts: {plan_start_count}, plan_ends: {plan_end_count}, "
                 f"latent_starts: {latent_start_count}, latent_ends: {latent_end_count}"
             )
-        
-        mask = input_ids == self.config.latent_id
+
         mask_unsqueezed = mask.unsqueeze(-1)
         mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
         latent_image_mask = mask_expanded.to(inputs_embeds.device)
@@ -579,6 +582,7 @@ def qwen3_vl_generation_forward(
         cache_position=cache_position,
         pixel_values_latent=pixel_values_latent,
         image_grid_thw_latent=image_grid_thw_latent,
+        image_out_mask=image_out_mask,
         in_latent_mode=in_latent_mode,
         latent_hidden_state=latent_hidden_state,
         **kwargs,

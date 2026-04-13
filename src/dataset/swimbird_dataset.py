@@ -415,9 +415,20 @@ class SwimBirdDataCollator:
         
         if batch['pixel_values_latent'] is not None:
             image_out_mask = mask_image_output_tokens(
-                batch["input_ids"], self.latent_start_idx, self.latent_token_idx
+                batch["input_ids"],
+                self.latent_start_idx,
+                self.latent_token_idx,
+                self.latent_end_idx,
             )
             batch["image_out_mask"] = image_out_mask
+
+            if _debug_plan_batch_print_count <= DEBUG_PLAN_BATCH_PRINT_LIMIT:
+                image_mask_count = int(image_out_mask.sum().item())
+                print(
+                    "[debug-plan-image-mask]",
+                    f"image_mask_tokens={image_mask_count}",
+                    f"latent_feature_tokens={latent_feature_count}",
+                )
             
         return batch
 

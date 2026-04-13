@@ -216,17 +216,18 @@ def generate_labels_after_multi_token_start(
 def mask_image_output_tokens(
     input_ids: torch.Tensor,
     image_start_token: int,
-    image_token: int
+    image_token: int,
+    image_end_token: int,
 ) -> torch.Tensor:
     """
-    Creates a mask of the same shape as `input_ids`, with 1's wherever we want to
-    'mask out' <image_token> after the first <image_start_token> has appeared,
-    and 0's everywhere else.
+    Creates a mask of the same shape as `input_ids`, with 1's on latent body
+    tokens that belong to image-backed latent spans only, and 0's elsewhere.
 
     Args:
       input_ids: shape [batch_size, seq_len]
-      image_start_token: the token ID that marks the start of an image chunk
-      image_token: the token ID for image tokens
+      image_start_token: token ID that marks the start of an image-backed latent span
+      image_token: token ID for latent body tokens
+      image_end_token: token ID that marks the end of an image-backed latent span
 
     Returns:
       A mask (torch.Tensor of the same shape) containing 0/1:
@@ -238,20 +239,16 @@ def mask_image_output_tokens(
 
     for i in range(batch_size):
         seq = input_ids[i]
-        # Find first occurrence of image_start_token
-        first_start_pos = -1
+        inside_image_latent = False
         for j in range(seq_len):
-            if seq[j] == image_start_token:
-                first_start_pos = j
-                break
-        
-        if first_start_pos == -1:
-            continue
-        
-        # For every position after the first <image_start_token>,
-        # if the token is <image_token>, set mask = 1
-        for k in range(first_start_pos + 1, seq_len):
-            if seq[k] == image_token:
-                mask[i, k] = 1
+            token = seq[j].item()
+            if token == image_start_token:
+                inside_image_latent = True
+                continue
+            if token == image_end_token:
+                inside_image_latent = False
+                continue
+            if inside_image_latent and token == image_token:
+                mask[i, j] = 1
 
     return mask
