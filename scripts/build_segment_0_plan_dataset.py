@@ -10,6 +10,13 @@ IMAGE_MARKER = "<image>"
 PLAN_START = "<|plan_start|>"
 PLAN_END = "<|plan_end|>"
 LATENT = "<|latent|>"
+SKIP_NAME_PATTERNS = (
+    "_stats.json",
+    "_rejected.json",
+    "_bak.json",
+    "_thought0_latent_",
+    "_segment_0_plan",
+)
 
 
 def make_plan_span(plan_length: int) -> str:
@@ -19,13 +26,22 @@ def make_plan_span(plan_length: int) -> str:
 def iter_input_files(input_paths: list[Path]) -> Iterable[Path]:
     for path in input_paths:
         if path.is_file() and path.suffix == ".json":
+            if should_skip_file(path):
+                continue
             yield path
         elif path.is_dir():
             for file_path in sorted(path.glob("*.json")):
                 if file_path.is_file():
+                    if should_skip_file(file_path):
+                        continue
                     yield file_path
         else:
             raise FileNotFoundError(f"Unsupported input path: {path}")
+
+
+def should_skip_file(path: Path) -> bool:
+    name = path.name
+    return any(pattern in name for pattern in SKIP_NAME_PATTERNS)
 
 
 def replace_first_visible_reasoning_segment(text: str, plan_span: str):
