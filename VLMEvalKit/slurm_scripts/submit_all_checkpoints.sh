@@ -61,7 +61,7 @@ fi
 EXP_NAME="$1"
 shift
 
-DEFAULT_CHECKPOINT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird"
+DEFAULT_CHECKPOINT_ROOT="/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b"
 CHECKPOINT_ROOT="${DEFAULT_CHECKPOINT_ROOT}"
 
 if (( $# >= 1 )) && [[ -d "$1" ]]; then
