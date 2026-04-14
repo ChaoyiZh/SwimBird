@@ -22,6 +22,14 @@ from transformers.generation.streamers import BaseStreamer
 from transformers.cache_utils import Cache
 
 
+def _get_plan_ids_and_length(config):
+    plan_start_id = getattr(config, "plan_start_id", None)
+    plan_end_id = getattr(config, "plan_end_id", None)
+    plan_length = getattr(config, "max_plan_token", 8)
+    plan_enabled = plan_start_id is not None and plan_end_id is not None
+    return plan_enabled, plan_start_id, plan_end_id, plan_length
+
+
 class SwimBird_Qwen2_5_VL(Qwen2_5_VLForConditionalGeneration):
     def __init__(self, config):
         super().__init__(config)
@@ -114,8 +122,10 @@ class SwimBird_Qwen2_5_VL(Qwen2_5_VLForConditionalGeneration):
                     generation_config.compile_config.fullgraph = False
             model_forward = self.get_compiled_call(generation_config.compile_config)
         
-        #Latent mode init
-        in_latent_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        # Hidden-mode init: image-backed latent mode plus optional plan mode.
+        in_visual_latent_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        in_plan_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        plan_enabled, plan_start_id, plan_end_id, plan_length = _get_plan_ids_and_length(self.config)
 
         latent_hidden_state = None
         latent_hidden_states = None
@@ -124,6 +134,8 @@ class SwimBird_Qwen2_5_VL(Qwen2_5_VLForConditionalGeneration):
 
         latent_steps_orig = torch.tensor(MAX_LATENT_LEN, dtype=torch.int, device=input_ids.device)  # original quota
         latent_remaining_steps = latent_steps_orig.clone()
+        plan_steps_orig = torch.full((batch_size,), int(plan_length), dtype=torch.int, device=input_ids.device)
+        plan_remaining_steps = plan_steps_orig.clone()
 
 
         # if generation_config.prefill_chunk_size is not None:
@@ -140,7 +152,8 @@ class SwimBird_Qwen2_5_VL(Qwen2_5_VLForConditionalGeneration):
             # model_inputs.update({"output_attentions": output_attentions} if output_attentions else {})
             # model_inputs.update({"output_hidden_states": output_hidden_states} if output_hidden_states else {})
 
-            model_inputs.update({"in_latent_mode": in_latent_mode})
+            in_hidden_mode = in_visual_latent_mode | in_plan_mode
+            model_inputs.update({"in_latent_mode": in_hidden_mode})
             model_inputs.update({"latent_hidden_state": latent_hidden_state})
 
             if is_prefill:
@@ -199,23 +212,49 @@ class SwimBird_Qwen2_5_VL(Qwen2_5_VLForConditionalGeneration):
             
             last_tokens = input_ids[:, -1]
             latent_start = (last_tokens == self.config.latent_start_id).to(device=input_ids.device)
+            plan_start = (
+                (last_tokens == plan_start_id).to(device=input_ids.device)
+                if plan_enabled
+                else torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+            )
+
             latent_end = (next_tokens == self.config.latent_end_id).to(device=input_ids.device)
-                               
-            temp_mode = in_latent_mode | latent_start       
+            plan_end = (
+                (next_tokens == plan_end_id).to(device=input_ids.device)
+                if plan_enabled
+                else torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+            )
 
-            just_entered = (~in_latent_mode) & temp_mode           
+            temp_visual_mode = in_visual_latent_mode | latent_start
+            temp_plan_mode = in_plan_mode | plan_start
 
-            latent_remaining_steps = torch.where(just_entered, latent_steps_orig, latent_remaining_steps)
-            latent_remaining_steps = latent_remaining_steps - in_latent_mode.long()
+            just_entered_visual = (~in_visual_latent_mode) & temp_visual_mode
+            just_entered_plan = (~in_plan_mode) & temp_plan_mode
 
-            force_end = in_latent_mode & (latent_remaining_steps <= 0)
-            latent_end = latent_end | force_end
-  
-            in_latent_mode = (temp_mode) & (~latent_end) 
+            latent_remaining_steps = torch.where(
+                just_entered_visual, latent_steps_orig, latent_remaining_steps
+            )
+            latent_remaining_steps = latent_remaining_steps - in_visual_latent_mode.long()
+
+            plan_remaining_steps = torch.where(
+                just_entered_plan, plan_steps_orig, plan_remaining_steps
+            )
+            plan_remaining_steps = plan_remaining_steps - in_plan_mode.long()
+
+            force_latent_end = in_visual_latent_mode & (latent_remaining_steps <= 0)
+            force_plan_end = in_plan_mode & (plan_remaining_steps <= 0)
+            latent_end = latent_end | force_latent_end
+            plan_end = plan_end | force_plan_end
+
+            in_visual_latent_mode = temp_visual_mode & (~latent_end)
+            in_plan_mode = temp_plan_mode & (~plan_end)
             latent_hidden_state = outputs.latent_hidden_state
-  
-            next_tokens[in_latent_mode, None] = self.config.latent_id
+
+            in_hidden_mode = in_visual_latent_mode | in_plan_mode
+            next_tokens[in_hidden_mode, None] = self.config.latent_id
             next_tokens[latent_end, None] = self.config.latent_end_id
+            if plan_enabled:
+                next_tokens[plan_end, None] = plan_end_id
 
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
@@ -352,8 +391,10 @@ class SwimBird_Qwen3VL(Qwen3VLForConditionalGeneration):
                     generation_config.compile_config.fullgraph = False
             model_forward = self.get_compiled_call(generation_config.compile_config)
         
-        #Latent mode init
-        in_latent_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        # Hidden-mode init: image-backed latent mode plus optional plan mode.
+        in_visual_latent_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        in_plan_mode = torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+        plan_enabled, plan_start_id, plan_end_id, plan_length = _get_plan_ids_and_length(self.config)
 
         latent_hidden_state = None
         latent_hidden_states = None
@@ -362,6 +403,8 @@ class SwimBird_Qwen3VL(Qwen3VLForConditionalGeneration):
 
         latent_steps_orig = torch.tensor(MAX_LATENT_LEN, dtype=torch.int, device=input_ids.device)  # original quota
         latent_remaining_steps = latent_steps_orig.clone()
+        plan_steps_orig = torch.full((batch_size,), int(plan_length), dtype=torch.int, device=input_ids.device)
+        plan_remaining_steps = plan_steps_orig.clone()
 
 
         # if generation_config.prefill_chunk_size is not None:
@@ -378,7 +421,8 @@ class SwimBird_Qwen3VL(Qwen3VLForConditionalGeneration):
             # model_inputs.update({"output_attentions": output_attentions} if output_attentions else {})
             # model_inputs.update({"output_hidden_states": output_hidden_states} if output_hidden_states else {})
 
-            model_inputs.update({"in_latent_mode": in_latent_mode})
+            in_hidden_mode = in_visual_latent_mode | in_plan_mode
+            model_inputs.update({"in_latent_mode": in_hidden_mode})
             model_inputs.update({"latent_hidden_state": latent_hidden_state})
 
             if is_prefill:
@@ -437,23 +481,49 @@ class SwimBird_Qwen3VL(Qwen3VLForConditionalGeneration):
             
             last_tokens = input_ids[:, -1]
             latent_start = (last_tokens == self.config.latent_start_id).to(device=input_ids.device)
+            plan_start = (
+                (last_tokens == plan_start_id).to(device=input_ids.device)
+                if plan_enabled
+                else torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+            )
+
             latent_end = (next_tokens == self.config.latent_end_id).to(device=input_ids.device)
-                               
-            temp_mode = in_latent_mode | latent_start       
+            plan_end = (
+                (next_tokens == plan_end_id).to(device=input_ids.device)
+                if plan_enabled
+                else torch.zeros(batch_size, dtype=torch.bool, device=input_ids.device)
+            )
 
-            just_entered = (~in_latent_mode) & temp_mode           
+            temp_visual_mode = in_visual_latent_mode | latent_start
+            temp_plan_mode = in_plan_mode | plan_start
 
-            latent_remaining_steps = torch.where(just_entered, latent_steps_orig, latent_remaining_steps)
-            latent_remaining_steps = latent_remaining_steps - in_latent_mode.long()
+            just_entered_visual = (~in_visual_latent_mode) & temp_visual_mode
+            just_entered_plan = (~in_plan_mode) & temp_plan_mode
 
-            force_end = in_latent_mode & (latent_remaining_steps <= 0)
-            latent_end = latent_end | force_end
+            latent_remaining_steps = torch.where(
+                just_entered_visual, latent_steps_orig, latent_remaining_steps
+            )
+            latent_remaining_steps = latent_remaining_steps - in_visual_latent_mode.long()
 
-            in_latent_mode = (temp_mode) & (~latent_end) 
+            plan_remaining_steps = torch.where(
+                just_entered_plan, plan_steps_orig, plan_remaining_steps
+            )
+            plan_remaining_steps = plan_remaining_steps - in_plan_mode.long()
+
+            force_latent_end = in_visual_latent_mode & (latent_remaining_steps <= 0)
+            force_plan_end = in_plan_mode & (plan_remaining_steps <= 0)
+            latent_end = latent_end | force_latent_end
+            plan_end = plan_end | force_plan_end
+
+            in_visual_latent_mode = temp_visual_mode & (~latent_end)
+            in_plan_mode = temp_plan_mode & (~plan_end)
             latent_hidden_state = outputs.latent_hidden_state
-    
-            next_tokens[in_latent_mode, None] = self.config.latent_id
+
+            in_hidden_mode = in_visual_latent_mode | in_plan_mode
+            next_tokens[in_hidden_mode, None] = self.config.latent_id
             next_tokens[latent_end, None] = self.config.latent_end_id
+            if plan_enabled:
+                next_tokens[plan_end, None] = plan_end_id
 
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
