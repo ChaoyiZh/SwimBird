@@ -3,7 +3,7 @@
 # export WANDB_DISABLED=true
 export WANDB_DISABLED=false
 export WANDB_PROJECT="${WANDB_PROJECT:-SwimBird}"
-export WANDB_NAME="${WANDB_NAME:-${RUN_NAME:-swimbird_singlenode_2b_segment_0_plan}}"
+export WANDB_NAME="${WANDB_NAME:-${RUN_NAME:-swimbird_singlenode_2b_best_ckpt_segment_0_plan}}"
 export WANDB_WATCH="${WANDB_WATCH:-false}"
 export WANDB_API_KEY="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"
 
@@ -24,7 +24,7 @@ DISTRIBUTED_ARGS="
 # model configs
 MODEL_SIZE='2B'
 MODEL_NAME="${MODEL_NAME:-models/Qwen3-VL-2B-Instruct}"
-INIT_CHECKPOINT="${INIT_CHECKPOINT:-/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b/checkpoint-5774}"
+INIT_CHECKPOINT="${INIT_CHECKPOINT:-/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b/checkpoint-1000}"
 
 DATA_PATH=(
     "SwimBird-SFT-92K-segment_0_plan/plan8/SwimBird-ZebraCoT"
@@ -51,8 +51,8 @@ MAX_LATENT_TOKEN=32
 MAX_TOKEN=16384
 MIN_TOKEN=2
 
-RUN_NAME="${RUN_NAME:-swimbird_singlenode_2b_segment_0_plan}"
-OUTPUT_DIR="${OUTPUT_DIR:-swimbird_singlenode_2b_segment_0_plan}"
+RUN_NAME="${RUN_NAME:-swimbird_singlenode_2b_best_ckpt_segment_0_plan}"
+OUTPUT_DIR="${OUTPUT_DIR:-swimbird_singlenode_2b_best_ckpt_segment_0_plan}"
 
 export PYTHONPATH=$(pwd)
 echo "[train] MODEL_NAME=${MODEL_NAME}"
