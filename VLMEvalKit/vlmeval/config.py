@@ -1800,7 +1800,7 @@ for step in (500, 1000, 1500, 2000,2500, 3000,3500, 4000, 4500,5000,5500, 5774):
         model_path=f'{SWIMBIRD_2B_LAST_CKPT_SEGMENT_0_PLAN_ROOT}/checkpoint-{step}',
         **SWIMBIRD_COMMON_KWARGS
     )
-    
+
 slime_series = {
     "Slime-7B": partial(SliME, model_path="yifanzhang114/SliME-vicuna-7B"),
     "Slime-8B": partial(SliME, model_path="yifanzhang114/SliME-Llama3-8B"),

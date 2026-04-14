@@ -88,13 +88,14 @@ elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b" ]]; then
 elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b_thought0_latent" ]]; then
     MODEL_PREFIX="SwimBird-SFT-2B-Thought0-Latent_ckpt"
 elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b_last_ckpt_segment_0_plan" ]]; then
-    MODEL_PREFIX="SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan"
+    MODEL_PREFIX="SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan_ckpt"
 else
     echo "Unsupported checkpoint root: ${CHECKPOINT_ROOT}" >&2
     echo "Expected one of:" >&2
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird" >&2
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b" >&2
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_thought0_latent" >&2
+    echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_last_ckpt_segment_0_plan" >&2
     exit 1
 fi
 
@@ -131,6 +132,7 @@ prefix_to_pattern = {
     "SwimBird-SFT-8B_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-8B_ckpt\{step\}'\]",
     "SwimBird-SFT-2B_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B_ckpt\{step\}'\]",
     "SwimBird-SFT-2B-Thought0-Latent_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Thought0-Latent_ckpt\{step\}'\]",
+    "SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan_ckpt\{step\}'\]",
 }
 
 pattern = prefix_to_pattern.get(model_prefix)
