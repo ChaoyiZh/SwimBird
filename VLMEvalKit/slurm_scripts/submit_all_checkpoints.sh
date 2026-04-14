@@ -132,7 +132,7 @@ prefix_to_pattern = {
     "SwimBird-SFT-8B_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-8B_ckpt\{step\}'\]",
     "SwimBird-SFT-2B_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B_ckpt\{step\}'\]",
     "SwimBird-SFT-2B-Thought0-Latent_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Thought0-Latent_ckpt\{step\}'\]",
-    "SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Last-Ckpt-Segment-0-Plan_ckpt\{step\}'\]",
+    "SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt\{step\}'\]",
 }
 
 pattern = prefix_to_pattern.get(model_prefix)
