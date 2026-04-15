@@ -50,6 +50,8 @@ Notes:
   - Example: swimbird/checkpoint-400 -> SwimBird-SFT-8B_ckpt400
   - Example: swimbird_singlenode_2b/checkpoint-4200 -> SwimBird-SFT-2B_ckpt4200
   - Example: swimbird_singlenode_2b_thought0_latent/checkpoint-600 -> SwimBird-SFT-2B-Thought0-Latent_ckpt600
+  - Example: swimbird_singlenode_2b_best_ckpt_segment_0_plan/checkpoint-1000 -> SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt1000
+  - Example: swimbird_singlenode_2b_best_ckpt_segment_0_plan_no_openmmreasoner/checkpoint-1000 -> SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner_ckpt1000
   - The checkpoint aliases must exist in vlmeval/config.py.
 EOF
     exit 1
@@ -89,6 +91,8 @@ elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b_thought0_latent" ]]
     MODEL_PREFIX="SwimBird-SFT-2B-Thought0-Latent_ckpt"
 elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b_best_ckpt_segment_0_plan" ]]; then
     MODEL_PREFIX="SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt"
+elif [[ "${checkpoint_root_name}" == "swimbird_singlenode_2b_best_ckpt_segment_0_plan_no_openmmreasoner" ]]; then
+    MODEL_PREFIX="SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner_ckpt"
 else
     echo "Unsupported checkpoint root: ${CHECKPOINT_ROOT}" >&2
     echo "Expected one of:" >&2
@@ -96,6 +100,7 @@ else
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b" >&2
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_thought0_latent" >&2
     echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_best_ckpt_segment_0_plan" >&2
+    echo "  /project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_best_ckpt_segment_0_plan_no_openmmreasoner" >&2
     exit 1
 fi
 
@@ -133,6 +138,7 @@ prefix_to_pattern = {
     "SwimBird-SFT-2B_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B_ckpt\{step\}'\]",
     "SwimBird-SFT-2B-Thought0-Latent_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Thought0-Latent_ckpt\{step\}'\]",
     "SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt\{step\}'\]",
+    "SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner_ckpt": r"for step in \(([^)]*)\):\n\s*swimbird_series\[f'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner_ckpt\{step\}'\]",
 }
 
 pattern = prefix_to_pattern.get(model_prefix)

@@ -1740,6 +1740,7 @@ SWIMBIRD_8B_RETRAIN_ROOT = '/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD
 SWIMBIRD_2B_RETRAIN_ROOT = '/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b'
 SWIMBIRD_2B_THOUGHT0_LATENT_ROOT = '/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_thought0_latent'
 SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_ROOT = '/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_best_ckpt_segment_0_plan'
+SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_NO_OPENMMREASONER_ROOT = '/project/siyuh/common/chaoyi/workspace/code/SWIMBIRD/swimbird_singlenode_2b_best_ckpt_segment_0_plan_no_openmmreasoner'
 swimbird_series = {
     'SwimBird-SFT-8B': partial(
         SwimBird,
@@ -1774,6 +1775,14 @@ swimbird_series = {
             f'{SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_ROOT}/checkpoint-5774'
         ),
         **SWIMBIRD_COMMON_KWARGS
+    ),
+    'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner': partial(
+        SwimBird,
+        model_path=os.environ.get(
+            'SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_NO_OPENMMREASONER_MODEL_PATH',
+            f'{SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_NO_OPENMMREASONER_ROOT}/checkpoint-5774'
+        ),
+        **SWIMBIRD_COMMON_KWARGS
     )
 }
 
@@ -1797,10 +1806,17 @@ for step in (200, 400, 600, 800, 1000, 1200, 1278):
         **SWIMBIRD_COMMON_KWARGS
     )
 
-for step in (500, 1000, 1500, 2000,2500, 3000,3500, 4000, 4500,5000,5500, 5774):
+for step in ( 1000, 2000, 3000, 4000,5000, 5774):
     swimbird_series[f'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan_ckpt{step}'] = partial(
         SwimBird,
         model_path=f'{SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_ROOT}/checkpoint-{step}',
+        **SWIMBIRD_COMMON_KWARGS
+    )
+
+for step in ( 1000, 2000, 3000, 4000,5000, 5774):
+    swimbird_series[f'SwimBird-SFT-2B-Best-Ckpt-Segment-0-Plan-NoOpenMMReasoner_ckpt{step}'] = partial(
+        SwimBird,
+        model_path=f'{SWIMBIRD_2B_BEST_CKPT_SEGMENT_0_PLAN_NO_OPENMMREASONER_ROOT}/checkpoint-{step}',
         **SWIMBIRD_COMMON_KWARGS
     )
 
