@@ -1,5 +1,6 @@
 import re
 import os
+import json
 from pathlib import Path
 from typing import List, Union
 from torch.utils.data import Dataset
@@ -14,6 +15,16 @@ from src.constants import (
     PLAN_START_TOKEN,
     PLAN_END_TOKEN,
 )
+
+DEBUG_SAMPLE_PREVIEW_BUDGET = int(os.environ.get("SWIMBIRD_DEBUG_SAMPLE_PREVIEW", "0"))
+DEBUG_BATCH_PREVIEW_BUDGET = int(os.environ.get("SWIMBIRD_DEBUG_BATCH_PREVIEW", "0"))
+
+
+def _truncate_debug_text(value, limit=800):
+    if value is None:
+        return "<none>"
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return text if len(text) <= limit else text[:limit] + "...<truncated>"
 
 def is_plan_segment(text: str) -> bool:
     stripped = text.strip()
@@ -291,6 +302,8 @@ class SwimBirdDataCollator:
     def __init__(self, processor, args):
         self.processor = processor
         self.args = args
+        self._debug_sample_preview_remaining = DEBUG_SAMPLE_PREVIEW_BUDGET
+        self._debug_batch_preview_remaining = DEBUG_BATCH_PREVIEW_BUDGET
         
         # Precompute token IDs once
         self.latent_token_idx = processor.tokenizer(LATENT_TOKEN, return_tensors="pt")["input_ids"][0]
@@ -298,6 +311,70 @@ class SwimBirdDataCollator:
         self.latent_end_idx = processor.tokenizer(LATENT_END_TOKEN, return_tensors="pt")["input_ids"][0]
         self.pad_token_idx = processor.tokenizer("<|endoftext|>", return_tensors="pt")["input_ids"][0]
         self.answer_start_token_pattern = processor.tokenizer("<|im_start|>assistant", return_tensors="pt")["input_ids"][0]
+
+    def _debug_print_sample_preview(self, raw_examples, processed_examples, assistant_texts):
+        if self._debug_sample_preview_remaining <= 0:
+            return
+
+        for raw_example, processed_example, assistant_text in zip(raw_examples, processed_examples, assistant_texts):
+            if self._debug_sample_preview_remaining <= 0:
+                break
+
+            conversations = normalize_conversations(raw_example.get("conversations", []))
+            gpt_turn = next((turn for turn in conversations if turn.get("from") == "gpt"), {})
+            assistant_turn = next(
+                (turn for turn in processed_example if turn.get("role") == "assistant"),
+                {"content": []},
+            )
+
+            print("=" * 80)
+            print("[debug-seg0-sample]")
+            print(f"sample_id={raw_example.get('id', 'N/A')}")
+            print(f"raw_gpt={_truncate_debug_text(gpt_turn.get('value', ''))}")
+            print(
+                "processed_assistant_content="
+                + _truncate_debug_text(assistant_turn.get("content", []), limit=1200)
+            )
+            print(f"assistant_template={_truncate_debug_text(assistant_text, limit=1200)}")
+            self._debug_sample_preview_remaining -= 1
+
+    def _debug_print_batch_summary(self, batch):
+        if self._debug_batch_preview_remaining <= 0:
+            return
+
+        input_ids = batch["input_ids"]
+        labels = batch["labels"]
+        image_out_mask = batch.get("image_out_mask")
+        plan_start_id = self.processor.tokenizer.convert_tokens_to_ids(PLAN_START_TOKEN)
+        plan_end_id = self.processor.tokenizer.convert_tokens_to_ids(PLAN_END_TOKEN)
+        latent_id = self.processor.tokenizer.convert_tokens_to_ids(LATENT_TOKEN)
+
+        supervised_counts = (labels != -100).sum(dim=1).tolist()
+        plan_start_counts = (input_ids == plan_start_id).sum(dim=1).tolist()
+        plan_end_counts = (input_ids == plan_end_id).sum(dim=1).tolist()
+        latent_counts = (input_ids == latent_id).sum(dim=1).tolist()
+        image_out_counts = image_out_mask.sum(dim=1).tolist() if image_out_mask is not None else None
+
+        print("=" * 80)
+        print("[debug-seg0-batch]")
+        print(f"batch_size={input_ids.shape[0]}")
+        print(f"supervised_token_counts={supervised_counts}")
+        print(f"plan_start_counts={plan_start_counts}")
+        print(f"plan_end_counts={plan_end_counts}")
+        print(f"latent_token_counts={latent_counts}")
+        if image_out_counts is not None:
+            print(f"image_out_mask_counts={image_out_counts}")
+
+        for idx in range(min(2, input_ids.shape[0])):
+            supervised_token_ids = labels[idx][labels[idx] != -100].tolist()
+            decoded_supervised = self.processor.tokenizer.decode(supervised_token_ids, skip_special_tokens=False)
+            decoded_input = self.processor.tokenizer.decode(input_ids[idx].tolist(), skip_special_tokens=False)
+            print("-" * 80)
+            print(f"[debug-seg0-batch] sample_index={idx}")
+            print(f"input_text={_truncate_debug_text(decoded_input, limit=1200)}")
+            print(f"supervised_text={_truncate_debug_text(decoded_supervised, limit=1200)}")
+
+        self._debug_batch_preview_remaining -= 1
     
     def __call__(self, raw_examples):
         """Process batch of raw examples."""
@@ -326,6 +403,8 @@ class SwimBirdDataCollator:
         assistant_texts = [self.processor.apply_chat_template(ex, tokenize=False) for ex in assistant_examples]
         assistant_texts = replace_visual_spectial_tokens(assistant_texts)
         assistant_image_inputs, _ = process_vision_info(assistant_examples,image_patch_size=16)
+
+        self._debug_print_sample_preview(raw_examples, examples, assistant_texts)
         
         # Step 6: Tokenize and create batches
         user_batch = self.processor(text=user_texts, images=user_image_inputs, return_tensors="pt", padding=True)
@@ -361,6 +440,8 @@ class SwimBirdDataCollator:
                 self.latent_end_idx,
             )
             batch["image_out_mask"] = image_out_mask
+
+        self._debug_print_batch_summary(batch)
 
         return batch
 
